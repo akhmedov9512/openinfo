@@ -1,0 +1,13 @@
+# Celery worker Dockerfile
+FROM python:3.12.5-slim
+
+WORKDIR /app
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy all necessary files
+COPY api.py celeryconfig.py ./
+
+CMD ["celery", "-A", "api.celery_app", "worker", "--loglevel=info"]

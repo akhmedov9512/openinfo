@@ -1,0 +1,104 @@
+services:
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - PYTHONPATH=/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.celery
+    volumes:
+      - ./:/app
+    depends_on:
+      - redis
+      - api
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - PYTHONPATH=/app
+    restart: unless-stopped
+
+  celery_flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.flower
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./:/app
+    depends_on:
+      - redis
+      - celery_worker
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - PYTHONPATH=/app
+    restart: unless-stopped
+
+  
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    volumes:
+      - ./:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+
+  sqlite_web:
+      image: ghcr.io/coleifer/sqlite-web:latest
+      ports:
+        - "8002:8080"
+      volumes:
+        - ./:/data
+      environment:
+        - SQLITE_DATABASE=bot.db
+        - SQLITE_WEB_PASSWORD=123456
+        - SQLITE_WEB_PASSWORD_PROTECTED=1
+      command: [
+        "sqlite_web",
+        "--host=0.0.0.0",
+        "--password",
+        "/data/bot.db"
+      ]
+      restart: unless-stopped
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: bot_network
