@@ -20,6 +20,9 @@ from datetime import datetime, date
 import os
 from dotenv import load_dotenv
 
+import ssl
+
+
 # Загружаем переменные из .env файла (если он есть)
 load_dotenv()
 
@@ -251,6 +254,10 @@ async def mock_auth_api(login: str, password: str) -> Tuple[bool, str]:
     headers = {
         'Content-Type': 'application/json'
     }
+
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
 
     try:
         async with aiohttp.ClientSession() as session:
