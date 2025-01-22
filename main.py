@@ -239,8 +239,10 @@ async def mock_auth_api(login: str, password: str) -> Tuple[bool, str]:
     #     return True, "Success"
     # else:
     #     return False, "Invalid credentials"
-    
-    url = "http://100.67.2.103:8000//api/v2/userprofile/jwt/create/custom/"
+
+    url = "https://dev-v2-api.openinfo.uz/api/v2/userprofile/jwt/create/custom/"
+    #url = "http://100.67.2.103:8000//api/v2/userprofile/jwt/create/custom/"
+
 
     payload = json.dumps({
         "username": login,
