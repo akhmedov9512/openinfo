@@ -18,6 +18,8 @@ from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, InlineKey
 from calendar import monthcalendar
 from datetime import datetime, date
 import os
+
+from aiohttp import ClientSession, TCPConnector
 from dotenv import load_dotenv
 
 import ssl
@@ -238,14 +240,12 @@ class Database:
 db = Database()
 
 async def mock_auth_api(login: str, password: str) -> Tuple[bool, str]:
-    # if login == "admin1" and password == "12345":
+    # if login == "admin3" and password == "12345":
     #     return True, "Success"
     # else:
     #     return False, "Invalid credentials"
 
     url = "https://dev-v2-api.openinfo.uz/api/v2/userprofile/jwt/create/custom/"
-    #url = "http://100.67.2.103:8000//api/v2/userprofile/jwt/create/custom/"
-
 
     payload = json.dumps({
         "username": login,
@@ -255,12 +255,9 @@ async def mock_auth_api(login: str, password: str) -> Tuple[bool, str]:
         'Content-Type': 'application/json'
     }
 
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-
     try:
-        async with aiohttp.ClientSession() as session:
+        # Создаем сессию с отключенной проверкой SSL
+        async with ClientSession(connector=TCPConnector(ssl=False)) as session:
             async with session.post(url, headers=headers, data=payload) as response:
                 if response.status == 200:
                     data = await response.text()
@@ -284,6 +281,7 @@ async def mock_auth_api(login: str, password: str) -> Tuple[bool, str]:
     except Exception as e:
         logging.error(f"Auth API error: {str(e)}")
         return False, "Unexpected error during authentication"
+
 
 dp = Dispatcher(storage=MemoryStorage())
 
@@ -443,6 +441,7 @@ async def show_reports_calendar(message: Message, state: FSMContext):
         reply_markup=get_calendar_keyboard(current_date.year, current_date.month)
     )
 
+
 @dp.callback_query(lambda c: c.data.startswith(("date_", "prev_", "next_")))
 async def process_calendar_callback(callback_query: CallbackQuery, state: FSMContext):
     current_state = await state.get_state()
@@ -455,11 +454,11 @@ async def process_calendar_callback(callback_query: CallbackQuery, state: FSMCon
 
     data = callback_query.data.split("_")
     action = data[0]
-    
+
     if action == "date":
         year, month, day = map(int, data[1:])
         selected_date = date(year, month, day)
-        
+
         # Get reports for selected date
         reports = db.get_reports_by_date_range(
             date_from=datetime.combine(selected_date, datetime.min.time()),
@@ -467,11 +466,11 @@ async def process_calendar_callback(callback_query: CallbackQuery, state: FSMCon
             page=1,
             per_page=10
         )
-        
+
         if not reports['reports']:
             await callback_query.answer("No reports for this date")
             return
-            
+
         # Format report list
         report_text = "Reports for {selected_date}:\n\n"
         for report in reports['reports']:
@@ -481,12 +480,12 @@ async def process_calendar_callback(callback_query: CallbackQuery, state: FSMCon
                 f"👤 Created by: {report['creator']}\n"
                 f"🕒 {report['created_at']}\n\n"
             )
-            
+
         await callback_query.message.edit_text(
             report_text,
             reply_markup=get_calendar_keyboard(year, month)
         )
-    
+
     elif action in ("prev", "next"):
         year, month = map(int, data[1:])
         if action == "prev":
@@ -499,7 +498,7 @@ async def process_calendar_callback(callback_query: CallbackQuery, state: FSMCon
             if month > 12:
                 month = 1
                 year += 1
-                
+
         await callback_query.message.edit_reply_markup(
             reply_markup=get_calendar_keyboard(year, month)
         )
